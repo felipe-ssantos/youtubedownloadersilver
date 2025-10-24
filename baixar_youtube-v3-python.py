@@ -57,10 +57,11 @@ class YouTubeDownloader:
             anchor='w'
         ).pack(fill="x", pady=(0, 5))
         
-        # Frame para link e botão lado a lado
+        # Frame para link e botões
         link_frame = tk.Frame(main_frame, bg='#1a1a1a')
         link_frame.pack(fill="x", pady=(0, 15))
         
+        # Entry do link
         self.link_entry = tk.Entry(
             link_frame,
             font=('Segoe UI', 11),
@@ -76,10 +77,35 @@ class YouTubeDownloader:
         self.link_entry.bind('<FocusIn>', self.clear_placeholder)
         self.link_entry.bind('<FocusOut>', self.restore_placeholder)
         
+        # Frame para botões à direita
+        buttons_frame = tk.Frame(link_frame, bg='#1a1a1a')
+        buttons_frame.pack(side="left")
+        
+        # Botão Colar
+        self.paste_btn = tk.Button(
+            buttons_frame,
+            text="📋 Colar",
+            font=('Segoe UI', 9, 'bold'),
+            bg='#444444',
+            fg='#ffffff',
+            activebackground='#555555',
+            activeforeground='#ffffff',
+            relief='raised',
+            bd=2,
+            cursor='hand2',
+            command=self.paste_url,
+            width=8
+        )
+        self.paste_btn.pack(side="left", ipady=7, padx=(0, 5))
+        
+        # Efeito hover no botão Colar
+        self.paste_btn.bind('<Enter>', lambda e: self.paste_btn.config(bg='#555555'))
+        self.paste_btn.bind('<Leave>', lambda e: self.paste_btn.config(bg='#444444'))
+        
         # ========== BOTÃO INICIAR DOWNLOAD ==========
         self.download_btn = tk.Button(
-            link_frame,
-            text="⬇️ INICIAR DOWNLOAD",
+            buttons_frame,
+            text="⬇️ BAIXAR",
             font=('Segoe UI', 10, 'bold'),
             bg='#00aa44',
             fg='#ffffff',
@@ -89,11 +115,9 @@ class YouTubeDownloader:
             bd=2,
             cursor='hand2',
             command=self.start_download,
-            width=20,
-            anchor='center',
-            justify='center'
+            width=12
         )
-        self.download_btn.pack(side="right", ipady=5, ipadx=8)
+        self.download_btn.pack(side="left", ipady=7)
         
         # Efeito hover
         self.download_btn.bind('<Enter>', lambda e: self.download_btn.config(bg='#00cc55'))
@@ -314,12 +338,24 @@ class YouTubeDownloader:
         
         tk.Label(
             footer_frame,
-            text="Desenvolvido com Python, por Nelson Felipe. | Versão 1.0",
+            text="Desenvolvido com Python, por Nelson Felipe. | Versão 1.1",
             font=('Segoe UI', 9),
             bg='#1a1a1a',
             fg='#666666'
         ).pack()
-        
+    
+    def paste_url(self):
+        """Cola a URL da área de transferência"""
+        try:
+            # Limpa o campo
+            self.link_entry.delete(0, tk.END)
+            # Cola o conteúdo da área de transferência
+            clipboard_content = self.root.clipboard_get()
+            self.link_entry.insert(0, clipboard_content)
+            self.link_entry.config(fg='#ffffff')
+        except:
+            messagebox.showwarning("Aviso", "Nenhum conteúdo válido na área de transferência!")
+    
     def clear_placeholder(self, event):
         if self.link_entry.get() == "https://www.youtube.com/watch?v=...":
             self.link_entry.delete(0, tk.END)
@@ -394,7 +430,7 @@ class YouTubeDownloader:
         
         if not link or link == "https://www.youtube.com/watch?v=..." or not link.startswith('http'):
             messagebox.showerror("Erro", "Insira um link válido!")
-            self.download_btn.config(state="normal", text="⬇️ INICIAR DOWNLOAD", bg='#00aa44')
+            self.download_btn.config(state="normal", text="⬇️ BAIXAR", bg='#00aa44')
             return
         
         self.download_btn.config(state="disabled", text="⏳ BAIXANDO...", bg='#666666')
@@ -404,33 +440,50 @@ class YouTubeDownloader:
         try:
             fmt = self.format_var.get()
             
+            # Opções base SEM cookies - solução mais robusta
+            base_opts = {
+                'outtmpl': os.path.join(self.dest, '%(title)s.%(ext)s'),
+                'progress_hooks': [self.progress_hook],
+                # Configurações para evitar erro 403
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],
+                        'skip': ['dash', 'hls']
+                    }
+                },
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'DNT': '1',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1'
+                },
+                'quiet': False,
+                'no_warnings': False,
+            }
+            
             if fmt == "video":
                 res = self.resolution_var.get()
                 if res == "1080":
-                    f = "bestvideo[height<=1080]+bestaudio"
+                    f = "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[height<=1080]"
                 elif res == "720":
-                    f = "bestvideo[height<=720]+bestaudio"
+                    f = "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best[height<=720]"
                 else:
-                    f = "bestvideo+bestaudio"
+                    f = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
                 
-                opts = {
-                    'format': f,
-                    'merge_output_format': 'mp4',
-                    'outtmpl': os.path.join(self.dest, '%(title)s.%(ext)s'),
-                    'progress_hooks': [self.progress_hook]
-                }
+                base_opts['format'] = f
+                base_opts['merge_output_format'] = 'mp4'
             else:
-                opts = {
-                    'format': 'bestaudio',
-                    'postprocessors': [{
-                        'key': 'FFmpegExtractAudio',
-                        'preferredcodec': 'mp3',
-                    }],
-                    'outtmpl': os.path.join(self.dest, '%(title)s.%(ext)s'),
-                    'progress_hooks': [self.progress_hook]
-                }
+                base_opts['format'] = 'bestaudio[ext=m4a]/bestaudio/best'
+                base_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
             
-            with yt_dlp.YoutubeDL(opts) as ydl:
+            with yt_dlp.YoutubeDL(base_opts) as ydl:
                 ydl.download([link])
             
             self.status_label.config(text="✅ Concluído!", fg='#00ff00')
@@ -439,10 +492,17 @@ class YouTubeDownloader:
             
         except Exception as e:
             self.status_label.config(text="❌ Erro", fg='#ff0000')
-            messagebox.showerror("Erro", f"Falha no download:\n\n{str(e)}")
+            error_msg = str(e)
+            if "403" in error_msg or "Forbidden" in error_msg:
+                error_msg = "Erro 403: Acesso bloqueado pelo YouTube.\n\n"
+                error_msg += "Soluções:\n"
+                error_msg += "1. Atualize o yt-dlp: pip install --upgrade yt-dlp\n"
+                error_msg += "2. Verifique se o vídeo não é privado/restrito\n"
+                error_msg += "3. Tente novamente em alguns minutos"
+            messagebox.showerror("Erro", f"Falha no download:\n\n{error_msg}")
         
         finally:
-            self.download_btn.config(state="normal", text="⬇️ INICIAR DOWNLOAD", bg='#00aa44')
+            self.download_btn.config(state="normal", text="⬇️ BAIXAR", bg='#00aa44')
             self.progress['value'] = 0
             self.status_label.config(text="⏳ Aguardando...", fg='#aaaaaa')
     
